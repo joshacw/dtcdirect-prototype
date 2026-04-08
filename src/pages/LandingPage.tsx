@@ -1,13 +1,39 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, MessageSquare, List, FileText, Phone } from 'lucide-react';
+import { ArrowRight, MessageSquare, List, FileText, Phone, Mic, MicOff } from 'lucide-react';
 import SupportChat from '../components/SupportChat';
 import VoiceCall from '../components/VoiceCall';
 
 export default function LandingPage() {
   const [prompt, setPrompt] = useState('');
   const [showVoiceCall, setShowVoiceCall] = useState(false);
+  const [listening, setListening] = useState(false);
   const navigate = useNavigate();
+
+  const toggleSpeechToText = () => {
+    const SpeechRecognition = (window as unknown as Record<string, unknown>).SpeechRecognition || (window as unknown as Record<string, unknown>).webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+
+    if (listening) {
+      setListening(false);
+      return;
+    }
+
+    const recognition = new (SpeechRecognition as new () => SpeechRecognition)();
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+
+    recognition.onstart = () => setListening(true);
+    recognition.onend = () => setListening(false);
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      const transcript = Array.from(event.results)
+        .map(r => r[0].transcript)
+        .join('');
+      setPrompt(transcript);
+    };
+    recognition.start();
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,11 +89,15 @@ export default function LandingPage() {
                 <div className="flex justify-end gap-1.5 px-3 pb-3">
                   <button
                     type="button"
-                    onClick={() => setShowVoiceCall(true)}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-gray-400 transition hover:border-accent hover:bg-accent-light hover:text-accent"
-                    title="Start voice call"
+                    onClick={toggleSpeechToText}
+                    className={`flex h-8 w-8 items-center justify-center rounded-lg border transition ${
+                      listening
+                        ? 'border-red-300 bg-red-50 text-red-500'
+                        : 'border-gray-200 text-gray-400 hover:border-accent hover:bg-accent-light hover:text-accent'
+                    }`}
+                    title={listening ? 'Stop listening' : 'Voice to text'}
                   >
-                    <Phone size={15} />
+                    {listening ? <MicOff size={15} /> : <Mic size={15} />}
                   </button>
                   <button
                     type="submit"
@@ -103,6 +133,13 @@ export default function LandingPage() {
             >
               <FileText size={16} className="text-gray-400" />
               I know my filing type
+            </button>
+            <button
+              onClick={() => setShowVoiceCall(true)}
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-700 shadow-sm transition hover:border-gray-300 hover:bg-gray-50"
+            >
+              <Phone size={16} className="text-gray-400" />
+              Talk with support
             </button>
           </div>
         </div>

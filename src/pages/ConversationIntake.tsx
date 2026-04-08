@@ -1,8 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ArrowUp, ArrowRight, Check, Pencil, Phone } from 'lucide-react';
+import { ArrowUp, ArrowRight, Check, Pencil, Mic, MicOff } from 'lucide-react';
 import { useSurvey } from '../context/SurveyContext';
-import VoiceCall from '../components/VoiceCall';
 import type { ResolvedWorkflow } from '../config/routingMatrix';
 
 interface ChatMessage {
@@ -49,7 +48,7 @@ export default function ConversationIntake() {
   const [extractedFields, setExtractedFields] = useState<ExtractedFields>({});
   const [routingResult, setRoutingResult] = useState<RoutingResult | null>(null);
   const [editingFields, setEditingFields] = useState(false);
-  const [showVoiceCall, setShowVoiceCall] = useState(false);
+  const [listening, setListening] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const nextId = useRef(1);
   const sentInitial = useRef(false);
@@ -176,6 +175,31 @@ export default function ConversationIntake() {
       setStreaming(false);
     }
   }, [input, messages, streaming, extractedFields]);
+
+  const toggleSpeechToText = useCallback(() => {
+    const SpeechRecognition = (window as unknown as Record<string, unknown>).SpeechRecognition || (window as unknown as Record<string, unknown>).webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+
+    if (listening) {
+      setListening(false);
+      return;
+    }
+
+    const recognition = new (SpeechRecognition as new () => SpeechRecognition)();
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+
+    recognition.onstart = () => setListening(true);
+    recognition.onend = () => setListening(false);
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      const transcript = Array.from(event.results)
+        .map(r => r[0].transcript)
+        .join('');
+      setInput(transcript);
+    };
+    recognition.start();
+  }, [listening]);
 
   const handleConfirm = () => {
     if (!routingResult) return;
@@ -323,51 +347,37 @@ export default function ConversationIntake() {
 
           {/* Input */}
           <div className="border-t border-gray-100 px-6 py-4">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowVoiceCall(true)}
+            <div className="flex items-center rounded-xl border border-gray-200 bg-gray-50 transition-colors focus-within:border-accent focus-within:ring-1 focus-within:ring-accent">
+              <input
+                type="text"
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && !e.shiftKey && send()}
+                placeholder={routingResult ? 'Ask a follow-up or correct something…' : 'Describe your filing need…'}
                 disabled={streaming}
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-500 shadow-sm transition hover:border-accent hover:bg-accent-light hover:text-accent disabled:opacity-30"
-                title="Start voice call"
+                className="h-11 flex-1 bg-transparent px-4 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none disabled:opacity-50"
+              />
+              <button
+                onClick={toggleSpeechToText}
+                disabled={streaming}
+                className={`mr-1 flex h-8 w-8 items-center justify-center rounded-lg transition ${
+                  listening
+                    ? 'bg-red-50 text-red-500'
+                    : 'text-gray-400 hover:bg-gray-200 hover:text-gray-600'
+                } disabled:opacity-30`}
+                title={listening ? 'Stop listening' : 'Voice to text'}
               >
-                <Phone size={18} />
+                {listening ? <MicOff size={15} /> : <Mic size={15} />}
               </button>
-              <div className="flex flex-1 items-center rounded-xl border border-gray-200 bg-gray-50 transition-colors focus-within:border-accent focus-within:ring-1 focus-within:ring-accent">
-                <input
-                  type="text"
-                  value={input}
-                  onChange={e => setInput(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && !e.shiftKey && send()}
-                  placeholder={routingResult ? 'Ask a follow-up or correct something…' : 'Describe your filing need…'}
-                  disabled={streaming}
-                  className="h-11 flex-1 bg-transparent px-4 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none disabled:opacity-50"
-                />
-                <button
-                  onClick={() => send()}
-                  disabled={!input.trim() || streaming}
-                  className="mr-2 flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-white hover:bg-primary-hover disabled:opacity-30"
-                >
-                  <ArrowUp size={16} />
-                </button>
-              </div>
+              <button
+                onClick={() => send()}
+                disabled={!input.trim() || streaming}
+                className="mr-2 flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-white hover:bg-primary-hover disabled:opacity-30"
+              >
+                <ArrowUp size={16} />
+              </button>
             </div>
           </div>
-
-          {/* Voice call modal */}
-          {showVoiceCall && (
-            <VoiceCall
-              onClose={() => setShowVoiceCall(false)}
-              onTranscriptComplete={(entries) => {
-                // Add transcript entries to chat history
-                for (const entry of entries) {
-                  setMessages(prev => [
-                    ...prev,
-                    { id: nextId.current++, role: entry.role, text: entry.text },
-                  ]);
-                }
-              }}
-            />
-          )}
         </div>
       </div>
     </div>
