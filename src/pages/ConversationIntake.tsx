@@ -324,6 +324,14 @@ export default function ConversationIntake() {
           {/* Input */}
           <div className="border-t border-gray-100 px-6 py-4">
             <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowVoiceCall(true)}
+                disabled={streaming}
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-500 shadow-sm transition hover:border-accent hover:bg-accent-light hover:text-accent disabled:opacity-30"
+                title="Start voice call"
+              >
+                <Phone size={18} />
+              </button>
               <div className="flex flex-1 items-center rounded-xl border border-gray-200 bg-gray-50 transition-colors focus-within:border-accent focus-within:ring-1 focus-within:ring-accent">
                 <input
                   type="text"
@@ -334,14 +342,6 @@ export default function ConversationIntake() {
                   disabled={streaming}
                   className="h-11 flex-1 bg-transparent px-4 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none disabled:opacity-50"
                 />
-                <button
-                  onClick={() => setShowVoiceCall(true)}
-                  disabled={streaming}
-                  className="mr-1 flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-200 hover:text-accent disabled:opacity-30"
-                  title="Start voice call"
-                >
-                  <Phone size={16} />
-                </button>
                 <button
                   onClick={() => send()}
                   disabled={!input.trim() || streaming}
