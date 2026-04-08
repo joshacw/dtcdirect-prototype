@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dev",
+      "runtimeExecutable": "/Users/joshwilliams/dtcdirect-prototype/.claude/start-dev.sh",
+      "runtimeArgs": [],
+      "port": 5173
+    }
+  ]
+}
