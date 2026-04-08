@@ -13,11 +13,25 @@ Extract enough information through conversation to route the user to the correct
 
 ## Conversation Style
 - Be professional but approachable, like a knowledgeable colleague
-- Ask 1-2 questions per turn, not a full interrogation
+- ALWAYS end your response with exactly ONE question to keep the conversation moving. Never leave a turn without asking for the next piece of information you need.
+- Ask exactly ONE question per turn. Never combine two questions in one message.
 - Infer what you can from context (e.g., "been trading OTC for 3 years" → older issue, trades on exchange)
 - Confirm critical details by reading them back
-- Explain why you're asking when it's not obvious
 - Aim to resolve the workflow in 3-5 turns
+
+## Using askQuestion
+When your next question has a small set of predefined answers (yes/no, entity type, security type, etc.), use the askQuestion tool to present clickable options. This makes it faster for the user. Always include a short message before calling askQuestion to give context.
+
+Examples of when to use askQuestion:
+- "Is this a US or foreign entity?" → askQuestion with ["United States", "Foreign"]
+- "What type of security?" → askQuestion with ["Common Stock", "Preferred Stock", "ADR", ...]
+- "Does this security trade on a public exchange?" → askQuestion with ["Yes", "No"]
+- "Is this related to a corporate action?" → askQuestion with ["No corporate action", "Stock Split", "Name Change", ...]
+- "Is this a new or existing security?" → askQuestion with ["New security", "Already trading"]
+
+Do NOT use askQuestion for:
+- Open-ended questions like "What is your company name?"
+- Questions where the answer is free text
 
 ## Available Workflows
 | ID | Name | Trigger |
@@ -45,7 +59,7 @@ Extract enough information through conversation to route the user to the correct
 95+ countries are eligible. If someone mentions a country, assume it's eligible unless it's clearly a sanctioned nation.
 
 ## Tool Usage
-Use tools to record extracted information as you learn it. Call confirmRouting when you have enough information to determine the workflow. Always include a reason explaining your classification logic.
+Use tools to record extracted information as you learn it. Call confirmRouting when you have enough information to determine the workflow. Always include a reason explaining your classification logic. When you have enough info, call confirmRouting AND include a summary message.
 
 ## Important Rules
 - If someone mentions their shares are "already trading," "listed," "on the pink sheets," "on OTC," or similar → this is an Older Issue, NOT a New Issue
@@ -127,6 +141,21 @@ const TOOLS = [
         reason: { type: 'string' as const },
       },
       required: ['industries', 'reason'],
+    },
+  },
+  {
+    name: 'askQuestion',
+    description: 'Present a multiple-choice question to the user with clickable option buttons. Use this whenever the next question has a finite set of predefined answers. The user can click an option or type a custom answer.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        options: {
+          type: 'array' as const,
+          items: { type: 'string' as const },
+          description: 'The list of options to present as clickable buttons',
+        },
+      },
+      required: ['options'],
     },
   },
   {
@@ -230,7 +259,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (block.type === 'text') {
         message += block.text;
       } else if (block.type === 'tool_use') {
-        // Enrich confirmRouting with filing type label if not provided
         if (block.name === 'confirmRouting' && block.input.workflow_id && !block.input.filing_type) {
           block.input.filing_type = FILING_TYPE_MAP[block.input.workflow_id as string] || block.input.workflow_id;
         }
@@ -238,22 +266,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    // If the model used tools and stopped for tool results, we need to continue
-    // For this prototype, we handle tool calls client-side and re-send if needed
-    if (data.stop_reason === 'tool_use' && !message) {
-      // The model only produced tool calls with no text. We need to send tool results
-      // back and get a text response. Build tool results and continue.
-      const toolResultMessages = [
-        ...messages.map((m: { role: string; content: string }) => ({
-          role: m.role,
-          content: m.content,
-        })),
-        { role: 'assistant', content: data.content },
+    // Loop: keep sending tool results back until we get a text response
+    let currentData = data;
+    let conversationMessages = messages.map((m: { role: string; content: string }) => ({
+      role: m.role,
+      content: m.content,
+    }));
+    let iterations = 0;
+
+    while (currentData.stop_reason === 'tool_use' && iterations < 5) {
+      iterations++;
+      message = ''; // Clear preamble, we want the final post-tool response
+
+      conversationMessages = [
+        ...conversationMessages,
+        { role: 'assistant', content: currentData.content },
         {
           role: 'user',
-          content: data.content
+          content: currentData.content
             .filter((b: { type: string }) => b.type === 'tool_use')
-            .map((b: { type: string; id: string; name: string }) => ({
+            .map((b: { type: string; id: string }) => ({
               type: 'tool_result',
               tool_use_id: b.id,
               content: 'Recorded successfully.',
@@ -273,21 +305,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           max_tokens: 1024,
           system: EXTRACTION_SYSTEM_PROMPT + contextNote,
           tools: TOOLS,
-          messages: toolResultMessages,
+          messages: conversationMessages,
         }),
       });
 
-      if (followUp.ok) {
-        const followUpData = await followUp.json();
-        for (const block of followUpData.content) {
-          if (block.type === 'text') {
-            message += block.text;
-          } else if (block.type === 'tool_use') {
-            if (block.name === 'confirmRouting' && block.input.workflow_id && !block.input.filing_type) {
-              block.input.filing_type = FILING_TYPE_MAP[block.input.workflow_id as string] || block.input.workflow_id;
-            }
-            toolCalls.push({ name: block.name, args: block.input });
+      if (!followUp.ok) break;
+
+      currentData = await followUp.json();
+      for (const block of currentData.content) {
+        if (block.type === 'text') {
+          message += block.text;
+        } else if (block.type === 'tool_use') {
+          if (block.name === 'confirmRouting' && block.input.workflow_id && !block.input.filing_type) {
+            block.input.filing_type = FILING_TYPE_MAP[block.input.workflow_id as string] || block.input.workflow_id;
           }
+          toolCalls.push({ name: block.name, args: block.input });
         }
       }
     }

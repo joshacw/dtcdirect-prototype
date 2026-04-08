@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ArrowUp, ArrowRight, Bot, Check, Pencil } from 'lucide-react';
+import { ArrowUp, ArrowRight, Check, Pencil } from 'lucide-react';
 import { useSurvey } from '../context/SurveyContext';
 import type { ResolvedWorkflow } from '../config/routingMatrix';
 
@@ -8,6 +8,7 @@ interface ChatMessage {
   id: number;
   role: 'user' | 'assistant';
   text: string;
+  options?: string[]; // inline choice buttons
 }
 
 interface ExtractedFields {
@@ -71,12 +72,17 @@ export default function ConversationIntake() {
     const msg = (text || input).trim();
     if (!msg || streaming) return;
 
+    // Clear options from previous assistant message
+    setMessages(prev => prev.map(m =>
+      m.options ? { ...m, options: undefined } : m
+    ));
+
     const userMsg: ChatMessage = { id: nextId.current++, role: 'user', text: msg };
     setMessages(prev => [...prev, userMsg]);
     setInput('');
     setStreaming(true);
 
-    // Build history for API
+    // Build history for API (strip options, they're UI-only)
     const history = messages
       .filter(m => m.id > 0)
       .map(m => ({ role: m.role, content: m.text }));
@@ -96,7 +102,9 @@ export default function ConversationIntake() {
 
       const data = await response.json();
 
-      // Handle tool calls (extracted fields)
+      // Handle tool calls (extracted fields + askQuestion)
+      let questionOptions: string[] | undefined;
+
       if (data.toolCalls) {
         const newFields = { ...extractedFields };
         for (const call of data.toolCalls) {
@@ -123,6 +131,9 @@ export default function ConversationIntake() {
             case 'setIndustry':
               newFields.industries = call.args.industries;
               break;
+            case 'askQuestion':
+              questionOptions = call.args.options as string[];
+              break;
             case 'confirmRouting':
               setRoutingResult({
                 workflow: {
@@ -138,11 +149,16 @@ export default function ConversationIntake() {
         setExtractedFields(newFields);
       }
 
-      // Add assistant message
+      // Add assistant message with optional inline options
       if (data.message) {
         setMessages(prev => [
           ...prev,
-          { id: nextId.current++, role: 'assistant', text: data.message },
+          {
+            id: nextId.current++,
+            role: 'assistant',
+            text: data.message,
+            options: questionOptions,
+          },
         ]);
       }
     } catch {
@@ -163,7 +179,6 @@ export default function ConversationIntake() {
     if (!routingResult) return;
     const f = routingResult.fields;
 
-    // Populate SurveyContext
     if (f.corporateName) dispatch({ type: 'SET_FIELD', field: 'corporateName', value: f.corporateName });
     if (f.isMunicipal) dispatch({ type: 'SET_FIELD', field: 'isMunicipal', value: true });
     if (f.municipalName) dispatch({ type: 'SET_FIELD', field: 'municipalName', value: f.municipalName });
@@ -185,10 +200,6 @@ export default function ConversationIntake() {
     });
   };
 
-  const fieldCount = Object.values(extractedFields).filter(v =>
-    v !== undefined && v !== null && v !== '' && !(Array.isArray(v) && v.length === 0)
-  ).length;
-
   return (
     <div className="flex min-h-screen flex-col bg-white">
       {/* Header */}
@@ -205,47 +216,52 @@ export default function ConversationIntake() {
         </button>
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
-        {/* Chat area */}
-        <div className="flex flex-1 flex-col">
-          <div ref={scrollRef} className="flex flex-1 flex-col gap-4 overflow-y-auto px-6 py-6">
+      <div className="flex flex-1 justify-center overflow-hidden">
+        <div className="flex w-full max-w-[760px] flex-col">
+          <div ref={scrollRef} className="flex flex-1 flex-col gap-5 overflow-y-auto px-6 py-6">
             {messages.map(msg => (
-              <div
-                key={msg.id}
-                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                {msg.role === 'assistant' && (
-                  <div className="mr-2 mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent-light">
-                    <Bot size={14} className="text-accent" />
+              <div key={msg.id}>
+                {msg.role === 'user' ? (
+                  <div className="flex justify-end">
+                    <div className="max-w-[75%] rounded-2xl bg-primary px-4 py-3 text-sm leading-relaxed text-white">
+                      {renderMarkdown(msg.text)}
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="text-sm leading-relaxed text-gray-800">
+                      {renderMarkdown(msg.text)}
+                    </div>
+                    {/* Inline choice buttons */}
+                    {msg.options && msg.options.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {msg.options.map(option => (
+                          <button
+                            key={option}
+                            onClick={() => send(option)}
+                            disabled={streaming}
+                            className="rounded-lg border border-gray-200 bg-white px-3.5 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:border-accent hover:bg-accent-light hover:text-accent disabled:opacity-40"
+                          >
+                            {option}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
-                <div
-                  className={`max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
-                    msg.role === 'user'
-                      ? 'bg-primary text-white'
-                      : 'bg-gray-100 text-gray-800'
-                  }`}
-                >
-                  {renderMarkdown(msg.text)}
-                </div>
               </div>
             ))}
             {streaming && (
-              <div className="flex justify-start">
-                <div className="mr-2 mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent-light">
-                  <Bot size={14} className="text-accent" />
-                </div>
-                <div className="flex items-center gap-1.5 rounded-2xl bg-gray-100 px-4 py-3">
-                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-gray-400" style={{ animationDelay: '0ms' }} />
-                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-gray-400" style={{ animationDelay: '150ms' }} />
-                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-gray-400" style={{ animationDelay: '300ms' }} />
-                </div>
+              <div className="flex items-center gap-1.5 py-1">
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-gray-400" style={{ animationDelay: '0ms' }} />
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-gray-400" style={{ animationDelay: '150ms' }} />
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-gray-400" style={{ animationDelay: '300ms' }} />
               </div>
             )}
 
             {/* Confirmation card */}
             {routingResult && !editingFields && (
-              <div className="mx-auto mt-4 w-full max-w-md rounded-xl border border-accent/20 bg-accent-light p-5">
+              <div className="mt-4 w-full rounded-xl border border-accent/20 bg-accent-light p-5">
                 <div className="flex items-center gap-2 text-accent">
                   <Check size={18} />
                   <span className="text-sm font-semibold">Filing Identified</span>
@@ -288,9 +304,8 @@ export default function ConversationIntake() {
               </div>
             )}
 
-            {/* Edit mode — let the user correct via chat */}
             {editingFields && (
-              <div className="mx-auto mt-4 w-full max-w-md rounded-xl border border-gray-200 bg-gray-50 p-4">
+              <div className="mt-4 w-full rounded-xl border border-gray-200 bg-gray-50 p-4">
                 <p className="text-sm text-gray-600">
                   Tell me what needs to change and I'll update the details.
                 </p>
@@ -306,7 +321,7 @@ export default function ConversationIntake() {
 
           {/* Input */}
           <div className="border-t border-gray-100 px-6 py-4">
-            <div className="mx-auto flex max-w-2xl items-center gap-2">
+            <div className="flex items-center gap-2">
               <div className="flex flex-1 items-center rounded-xl border border-gray-200 bg-gray-50 transition-colors focus-within:border-accent focus-within:ring-1 focus-within:ring-accent">
                 <input
                   type="text"
@@ -328,44 +343,6 @@ export default function ConversationIntake() {
             </div>
           </div>
         </div>
-
-        {/* Side panel: extracted fields */}
-        {fieldCount > 0 && (
-          <div className="hidden w-72 shrink-0 border-l border-gray-100 bg-gray-50/50 p-5 lg:block">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400">
-              Extracted Details
-            </h3>
-            <div className="mt-3 space-y-2">
-              {extractedFields.corporateName && (
-                <ExtractedItem label="Company" value={extractedFields.corporateName} />
-              )}
-              {extractedFields.municipalName && (
-                <ExtractedItem label="Municipality" value={extractedFields.municipalName} />
-              )}
-              {extractedFields.country && (
-                <ExtractedItem
-                  label="Jurisdiction"
-                  value={`${extractedFields.country}${extractedFields.usState ? `, ${extractedFields.usState}` : ''}`}
-                />
-              )}
-              {extractedFields.entityType && (
-                <ExtractedItem label="Entity Type" value={extractedFields.entityType === 'us' ? 'US' : 'Foreign'} />
-              )}
-              {extractedFields.securityType && (
-                <ExtractedItem label="Security Type" value={extractedFields.securityType} />
-              )}
-              {extractedFields.corporateAction && extractedFields.corporateAction !== 'None' && (
-                <ExtractedItem label="Corporate Action" value={extractedFields.corporateAction} />
-              )}
-              {extractedFields.tradesOnExchange !== undefined && extractedFields.tradesOnExchange !== null && (
-                <ExtractedItem label="Trades on Exchange" value={extractedFields.tradesOnExchange ? 'Yes' : 'No'} />
-              )}
-              {extractedFields.industries && extractedFields.industries.length > 0 && (
-                <ExtractedItem label="Industry" value={extractedFields.industries.join(', ')} />
-              )}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
@@ -376,15 +353,6 @@ function FieldRow({ label, value }: { label: string; value: string }) {
     <div className="flex items-baseline justify-between text-sm">
       <span className="text-gray-500">{label}</span>
       <span className="font-medium text-gray-900">{value}</span>
-    </div>
-  );
-}
-
-function ExtractedItem({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-lg bg-white p-2.5 shadow-sm">
-      <div className="text-[10px] font-medium uppercase tracking-wider text-gray-400">{label}</div>
-      <div className="mt-0.5 text-sm font-medium text-gray-800">{value}</div>
     </div>
   );
 }
