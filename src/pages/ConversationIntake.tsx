@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ArrowUp, ArrowRight, Check, Pencil } from 'lucide-react';
+import { ArrowUp, ArrowRight, Check, Pencil, Phone } from 'lucide-react';
 import { useSurvey } from '../context/SurveyContext';
+import VoiceCall from '../components/VoiceCall';
 import type { ResolvedWorkflow } from '../config/routingMatrix';
 
 interface ChatMessage {
@@ -48,6 +49,7 @@ export default function ConversationIntake() {
   const [extractedFields, setExtractedFields] = useState<ExtractedFields>({});
   const [routingResult, setRoutingResult] = useState<RoutingResult | null>(null);
   const [editingFields, setEditingFields] = useState(false);
+  const [showVoiceCall, setShowVoiceCall] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const nextId = useRef(1);
   const sentInitial = useRef(false);
@@ -333,6 +335,14 @@ export default function ConversationIntake() {
                   className="h-11 flex-1 bg-transparent px-4 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none disabled:opacity-50"
                 />
                 <button
+                  onClick={() => setShowVoiceCall(true)}
+                  disabled={streaming}
+                  className="mr-1 flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-200 hover:text-accent disabled:opacity-30"
+                  title="Start voice call"
+                >
+                  <Phone size={16} />
+                </button>
+                <button
                   onClick={() => send()}
                   disabled={!input.trim() || streaming}
                   className="mr-2 flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-white hover:bg-primary-hover disabled:opacity-30"
@@ -342,6 +352,22 @@ export default function ConversationIntake() {
               </div>
             </div>
           </div>
+
+          {/* Voice call modal */}
+          {showVoiceCall && (
+            <VoiceCall
+              onClose={() => setShowVoiceCall(false)}
+              onTranscriptComplete={(entries) => {
+                // Add transcript entries to chat history
+                for (const entry of entries) {
+                  setMessages(prev => [
+                    ...prev,
+                    { id: nextId.current++, role: entry.role, text: entry.text },
+                  ]);
+                }
+              }}
+            />
+          )}
         </div>
       </div>
     </div>
