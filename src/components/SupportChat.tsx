@@ -86,7 +86,7 @@ export default function SupportChat({ variant = 'light', filingContext }: Props)
       </button>
 
       {open && (
-        <div className="fixed bottom-6 right-6 z-50 flex h-[500px] w-[400px] flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl">
+        <div className="fixed inset-y-0 right-0 z-50 flex w-[600px] flex-col overflow-hidden border-l border-gray-200 bg-white shadow-2xl">
           {/* Header */}
           <div className="flex items-center justify-between bg-primary px-4 py-3">
             <div className="flex items-center gap-2 text-white">
