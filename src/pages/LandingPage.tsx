@@ -55,7 +55,7 @@ export default function LandingPage() {
 
       {/* Center: main content */}
       <div className="flex flex-1 flex-col items-center justify-center px-6">
-        <div className="flex w-full max-w-[560px] flex-col items-center">
+        <div className="flex w-full max-w-[720px] flex-col items-center">
           {/* Headline */}
           <h1 className="text-center text-3xl font-semibold tracking-tight text-gray-900">
             Get Your Securities DTC Eligible
@@ -120,7 +120,7 @@ export default function LandingPage() {
           </div>
 
           {/* Alternative paths */}
-          <div className="mt-6 flex w-full gap-3">
+          <div className="mt-6 flex w-full flex-col gap-3 sm:flex-row">
             <button
               onClick={() => navigate('/survey/corporate-name')}
               className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-700 shadow-sm transition hover:border-gray-300 hover:bg-gray-50"
