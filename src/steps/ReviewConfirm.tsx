@@ -17,7 +17,7 @@ export default function ReviewConfirm() {
 
   const handleConfirm = () => {
     dispatch({ type: 'MARK_COMPLETE', stepId: 'review' });
-    navigate('/app');
+    navigate('/auth', { state: { source: 'survey' } });
   };
 
   const corporateInfoItems = [

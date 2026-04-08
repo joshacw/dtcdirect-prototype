@@ -1,7 +1,11 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { SurveyProvider } from './context/SurveyContext';
 import SurveyLayout from './layouts/SurveyLayout';
 import AppShellLayout from './layouts/AppShellLayout';
+import LandingPage from './pages/LandingPage';
+import ConversationIntake from './pages/ConversationIntake';
+import DirectSelect from './pages/DirectSelect';
+import AuthGate from './pages/AuthGate';
 import CorporateName from './steps/CorporateName';
 import Jurisdiction from './steps/Jurisdiction';
 import SecurityType from './steps/SecurityType';
@@ -21,7 +25,10 @@ export default function App() {
     <BrowserRouter>
       <SurveyProvider>
         <Routes>
-          <Route path="/" element={<Navigate to="/survey/corporate-name" replace />} />
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/chat" element={<ConversationIntake />} />
+          <Route path="/select" element={<DirectSelect />} />
+          <Route path="/auth" element={<AuthGate />} />
           <Route path="/survey" element={<SurveyLayout />}>
             <Route path="corporate-name" element={<CorporateName />} />
             <Route path="jurisdiction" element={<Jurisdiction />} />

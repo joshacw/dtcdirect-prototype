@@ -18,7 +18,7 @@ export default function MunicipalConfirm() {
 
   const handleConfirm = () => {
     dispatch({ type: 'MARK_COMPLETE', stepId: 'municipal-confirm' });
-    navigate('/app');
+    navigate('/auth', { state: { workflow, source: 'survey' } });
   };
 
   return (
