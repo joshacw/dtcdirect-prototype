@@ -192,12 +192,10 @@ export class DTCAgent {
    * Uses retrieved KB entries to construct a contextual answer.
    */
   private simulateResponse(
-    query: string,
+    _query: string,
     kbEntries: KBEntry[],
     filingContext?: FilingContext,
   ): string {
-    const lower = query.toLowerCase();
-
     // If we have relevant KB entries, use the best one
     if (kbEntries.length > 0) {
       const best = kbEntries[0];

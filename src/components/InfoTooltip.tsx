@@ -7,7 +7,7 @@ interface Props {
 
 export default function InfoTooltip({ text = 'Click here to learn more' }: Props) {
   const [show, setShow] = useState(false);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const timeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const handleEnter = () => {
     clearTimeout(timeoutRef.current);
