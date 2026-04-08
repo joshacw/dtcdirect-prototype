@@ -3,6 +3,7 @@ import { Phone, PhoneOff, Mic, MicOff, X } from 'lucide-react';
 import VapiModule from '@vapi-ai/web';
 // Handle both ESM default and CJS module wrapping
 const Vapi = (VapiModule as unknown as { default: typeof VapiModule }).default || VapiModule;
+import { VOICE_AGENT_OVERRIDES } from '../config/voiceAgentPrompt';
 
 interface TranscriptEntry {
   id: number;
@@ -122,7 +123,7 @@ export default function VoiceCall({ onClose, onTranscriptComplete }: Props) {
         setCallStatus('ended');
       });
 
-      await vapi.start(VAPI_ASSISTANT_ID);
+      await vapi.start(VAPI_ASSISTANT_ID, VOICE_AGENT_OVERRIDES);
     } catch (err) {
       console.error('Failed to start call:', err);
       setCallStatus('ended');
