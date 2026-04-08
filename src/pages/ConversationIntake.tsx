@@ -185,7 +185,8 @@ export default function ConversationIntake() {
       return;
     }
 
-    const recognition = new (SpeechRecognition as new () => unknown)() as SpeechRecognition;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const recognition = new (SpeechRecognition as any)();
     recognition.continuous = false;
     recognition.interimResults = true;
     recognition.lang = 'en-US';
