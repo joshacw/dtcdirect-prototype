@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Phone, PhoneOff, Mic, MicOff } from 'lucide-react';
-import Vapi from '@vapi-ai/web';
+import VapiModule from '@vapi-ai/web';
+// Handle both ESM default and CJS module wrapping
+const Vapi = (VapiModule as unknown as { default: typeof VapiModule }).default || VapiModule;
 
 interface TranscriptEntry {
   id: number;
@@ -22,7 +24,7 @@ export default function VoiceCall({ onClose, onTranscriptComplete }: Props) {
   const [isMuted, setIsMuted] = useState(false);
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
   const [duration, setDuration] = useState(0);
-  const vapiRef = useRef<Vapi | null>(null);
+  const vapiRef = useRef<InstanceType<typeof Vapi> | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const nextId = useRef(1);
   const timerRef = useRef<ReturnType<typeof setInterval>>(null);
