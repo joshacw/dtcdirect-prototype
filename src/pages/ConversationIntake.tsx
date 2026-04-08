@@ -185,7 +185,7 @@ export default function ConversationIntake() {
       return;
     }
 
-    const recognition = new (SpeechRecognition as new () => SpeechRecognition)();
+    const recognition = new (SpeechRecognition as new () => unknown)() as SpeechRecognition;
     recognition.continuous = false;
     recognition.interimResults = true;
     recognition.lang = 'en-US';
