@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, MessageSquare, List, FileText } from 'lucide-react';
+import { ArrowRight, MessageSquare, List, FileText, Phone } from 'lucide-react';
 import SupportChat from '../components/SupportChat';
+import VoiceCall from '../components/VoiceCall';
 
 export default function LandingPage() {
   const [prompt, setPrompt] = useState('');
+  const [showVoiceCall, setShowVoiceCall] = useState(false);
   const navigate = useNavigate();
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -58,7 +60,15 @@ export default function LandingPage() {
                     className="flex-1 resize-none bg-transparent px-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none"
                   />
                 </div>
-                <div className="flex justify-end px-3 pb-3">
+                <div className="flex justify-end gap-1.5 px-3 pb-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowVoiceCall(true)}
+                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-gray-400 transition hover:border-accent hover:bg-accent-light hover:text-accent"
+                    title="Start voice call"
+                  >
+                    <Phone size={15} />
+                  </button>
                   <button
                     type="submit"
                     disabled={!prompt.trim()}
@@ -104,6 +114,12 @@ export default function LandingPage() {
           Need help? <SupportChat />
         </span>
       </div>
+
+      {showVoiceCall && (
+        <VoiceCall
+          onClose={() => setShowVoiceCall(false)}
+        />
+      )}
     </div>
   );
 }
