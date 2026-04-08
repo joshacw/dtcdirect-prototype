@@ -276,31 +276,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    // Loop: keep sending tool results back until we get a text response
+    // Loop: keep sending tool results back until we get a text response (end_turn)
     let currentData = data;
     let conversationMessages = messages.map((m: { role: string; content: string }) => ({
       role: m.role,
       content: m.content,
     }));
     let iterations = 0;
+    let lastTextMessage = message; // preserve any text from first response
 
-    while (currentData.stop_reason === 'tool_use' && iterations < 5) {
+    while (currentData.stop_reason === 'tool_use' && iterations < 8) {
       iterations++;
-      message = ''; // Clear preamble, we want the final post-tool response
+
+      // Build tool results — tell Claude to continue with its next question
+      const toolResults = currentData.content
+        .filter((b: { type: string }) => b.type === 'tool_use')
+        .map((b: { type: string; id: string; name: string }) => ({
+          type: 'tool_result',
+          tool_use_id: b.id,
+          content: b.name === 'askQuestion'
+            ? 'Options presented to user. Now write your question text to accompany these options. You MUST include a text response.'
+            : 'Recorded successfully. Continue with your next question to the user. You MUST include a text response.',
+        }));
 
       conversationMessages = [
         ...conversationMessages,
         { role: 'assistant', content: currentData.content },
-        {
-          role: 'user',
-          content: currentData.content
-            .filter((b: { type: string }) => b.type === 'tool_use')
-            .map((b: { type: string; id: string }) => ({
-              type: 'tool_result',
-              tool_use_id: b.id,
-              content: 'Recorded successfully.',
-            })),
-        },
+        { role: 'user', content: toolResults },
       ];
 
       const followUp = await fetch('https://api.anthropic.com/v1/messages', {
@@ -322,9 +324,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!followUp.ok) break;
 
       currentData = await followUp.json();
+      let iterationText = '';
       for (const block of currentData.content) {
         if (block.type === 'text') {
-          message += block.text;
+          iterationText += block.text;
         } else if (block.type === 'tool_use') {
           if (block.name === 'confirmRouting' && block.input.workflow_id && !block.input.filing_type) {
             block.input.filing_type = FILING_TYPE_MAP[block.input.workflow_id as string] || block.input.workflow_id;
@@ -332,6 +335,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           toolCalls.push({ name: block.name, args: block.input });
         }
       }
+
+      // Only replace message if we got new text; otherwise keep what we had
+      if (iterationText) {
+        message = iterationText;
+        lastTextMessage = iterationText;
+      }
+    }
+
+    // Fallback: if we still have no message after the loop, use the last known text or a default
+    if (!message.trim()) {
+      message = lastTextMessage.trim() || 'Thanks for that information. Let me continue — could you tell me a bit more about what you need?';
     }
 
     return res.status(200).json({ message, toolCalls: toolCalls.length > 0 ? toolCalls : undefined });
