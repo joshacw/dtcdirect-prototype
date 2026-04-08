@@ -38,22 +38,35 @@ export default function LandingPage() {
           {/* Prompt box */}
           <form onSubmit={handleSubmit} className="mt-8 w-full">
             <div className="relative">
-              <div className="flex items-center rounded-xl border border-gray-200 bg-gray-50 shadow-sm transition-colors focus-within:border-accent focus-within:ring-1 focus-within:ring-accent">
-                <MessageSquare size={18} className="ml-4 shrink-0 text-gray-400" />
-                <input
-                  type="text"
-                  value={prompt}
-                  onChange={e => setPrompt(e.target.value)}
-                  placeholder="Describe your filing need…"
-                  className="h-12 flex-1 bg-transparent px-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none"
-                />
-                <button
-                  type="submit"
-                  disabled={!prompt.trim()}
-                  className="mr-2 flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-white transition hover:bg-primary-hover disabled:opacity-30"
-                >
-                  <ArrowRight size={16} />
-                </button>
+              <div className="rounded-xl border border-gray-200 bg-gray-50 shadow-sm transition-colors focus-within:border-accent focus-within:ring-1 focus-within:ring-accent">
+                <div className="flex items-start pt-3">
+                  <MessageSquare size={18} className="ml-4 mt-0.5 shrink-0 text-gray-400" />
+                  <textarea
+                    value={prompt}
+                    onChange={e => setPrompt(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        if (prompt.trim()) {
+                          const form = e.currentTarget.closest('form');
+                          form?.requestSubmit();
+                        }
+                      }
+                    }}
+                    placeholder="Describe your filing need…"
+                    rows={3}
+                    className="flex-1 resize-none bg-transparent px-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none"
+                  />
+                </div>
+                <div className="flex justify-end px-3 pb-3">
+                  <button
+                    type="submit"
+                    disabled={!prompt.trim()}
+                    className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-white transition hover:bg-primary-hover disabled:opacity-30"
+                  >
+                    <ArrowRight size={16} />
+                  </button>
+                </div>
               </div>
             </div>
           </form>
