@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Phone, PhoneOff, Mic, MicOff } from 'lucide-react';
+import { Phone, PhoneOff, Mic, MicOff, X } from 'lucide-react';
 import VapiModule from '@vapi-ai/web';
 // Handle both ESM default and CJS module wrapping
 const Vapi = (VapiModule as unknown as { default: typeof VapiModule }).default || VapiModule;
@@ -85,14 +85,6 @@ export default function VoiceCall({ onClose, onTranscriptComplete }: Props) {
         if (timerRef.current) clearInterval(timerRef.current);
       });
 
-      vapi.on('speech-start', () => {
-        // User started speaking — add placeholder
-        setTranscript(prev => [
-          ...prev,
-          { id: nextId.current++, role: 'user', text: '…', final: false },
-        ]);
-      });
-
       vapi.on('message', (msg: Record<string, unknown>) => {
         if (msg.type === 'transcript') {
           const role = msg.role as 'user' | 'assistant';
@@ -102,9 +94,13 @@ export default function VoiceCall({ onClose, onTranscriptComplete }: Props) {
           if (role === 'user') {
             setTranscript(prev => {
               const last = [...prev];
+              // Find the last non-final user entry to update, or add a new one
               const idx = last.findLastIndex(t => t.role === 'user' && !t.final);
               if (idx >= 0) {
                 last[idx] = { ...last[idx], text, final: isFinal };
+              } else {
+                // No placeholder — add a new entry
+                last.push({ id: nextId.current++, role: 'user', text, final: isFinal });
               }
               return last;
             });
@@ -158,121 +154,120 @@ export default function VoiceCall({ onClose, onTranscriptComplete }: Props) {
     };
   }, []);
 
+  // Filter out empty/placeholder entries for display
+  const visibleTranscript = transcript.filter(t => t.text !== '…' || !t.final);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="flex h-[600px] w-full max-w-[520px] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
-        {/* Header */}
-        <div className="bg-primary px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="flex items-baseline gap-1 text-lg font-bold">
-                <span className="text-accent-light">DTC</span>
-                <span className="text-white">Direct</span>
-              </div>
-              <p className="mt-0.5 text-xs text-white/60">Voice Filing Assistant</p>
-            </div>
+    <div className="fixed inset-y-0 right-0 z-50 flex w-[600px] flex-col overflow-hidden border-l border-gray-200 bg-white shadow-2xl">
+      {/* Header */}
+      <div className="flex items-center justify-between bg-primary px-4 py-3">
+        <div className="flex items-center gap-2 text-white">
+          <Phone size={18} />
+          <div>
+            <span className="text-sm font-semibold">Voice Filing Assistant</span>
             {callStatus === 'active' && (
-              <div className="flex items-center gap-2">
-                <span className="h-2 w-2 animate-pulse rounded-full bg-red-400" />
-                <span className="text-sm font-medium text-white">{formatTime(duration)}</span>
-              </div>
+              <span className="ml-2 inline-flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-400" />
+                <span className="text-xs font-medium text-white/80">{formatTime(duration)}</span>
+              </span>
             )}
           </div>
         </div>
+        <button onClick={onClose} className="text-white/70 hover:text-white">
+          <X size={18} />
+        </button>
+      </div>
 
-        {/* Transcript area */}
-        <div ref={scrollRef} className="flex flex-1 flex-col gap-4 overflow-y-auto px-6 py-5">
-          {callStatus === 'idle' && (
-            <div className="flex flex-1 flex-col items-center justify-center text-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-accent-light">
-                <Phone size={28} className="text-accent" />
-              </div>
-              <h2 className="mt-4 text-lg font-semibold text-gray-900">Start a Voice Call</h2>
-              <p className="mt-1.5 max-w-[280px] text-sm text-gray-500">
-                Speak with our AI assistant to set up your filing. Your conversation will be transcribed in real time.
-              </p>
-              <button
-                onClick={startCall}
-                className="mt-6 flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-primary-hover"
-              >
-                <Phone size={16} />
-                Start Call
-              </button>
+      {/* Transcript area */}
+      <div ref={scrollRef} className="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
+        {callStatus === 'idle' && (
+          <div className="flex flex-1 flex-col items-center justify-center text-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-accent-light">
+              <Phone size={28} className="text-accent" />
             </div>
-          )}
+            <h2 className="mt-4 text-lg font-semibold text-gray-900">Start a Voice Call</h2>
+            <p className="mt-1.5 max-w-[280px] text-sm text-gray-500">
+              Speak with our AI assistant to set up your filing. Your conversation will be transcribed in real time.
+            </p>
+            <button
+              onClick={startCall}
+              className="mt-6 flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-primary-hover"
+            >
+              <Phone size={16} />
+              Start Call
+            </button>
+          </div>
+        )}
 
-          {callStatus === 'connecting' && (
-            <div className="flex flex-1 flex-col items-center justify-center text-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-accent-light">
-                <Phone size={28} className="animate-pulse text-accent" />
-              </div>
-              <p className="mt-4 text-sm font-medium text-gray-600">Connecting…</p>
+        {callStatus === 'connecting' && (
+          <div className="flex flex-1 flex-col items-center justify-center text-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-accent-light">
+              <Phone size={28} className="animate-pulse text-accent" />
             </div>
-          )}
+            <p className="mt-4 text-sm font-medium text-gray-600">Connecting…</p>
+          </div>
+        )}
 
-          {(callStatus === 'active' || callStatus === 'ended') && transcript.map(entry => (
-            <div key={entry.id}>
-              {entry.role === 'user' ? (
-                <div className="flex justify-end">
-                  <div className={`max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed text-white ${entry.final ? 'bg-primary' : 'bg-primary/60'}`}>
-                    {entry.text}
-                  </div>
-                </div>
-              ) : (
-                <div className="text-sm leading-relaxed text-gray-800">
-                  {entry.text}
-                </div>
-              )}
+        {(callStatus === 'active' || callStatus === 'ended') && visibleTranscript.map(entry => (
+          <div key={entry.id} className={`flex ${entry.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div
+              className={`max-w-[85%] rounded-lg px-3 py-2.5 text-sm leading-relaxed ${
+                entry.role === 'user'
+                  ? entry.final ? 'bg-primary text-white' : 'bg-primary/60 text-white'
+                  : 'bg-gray-100 text-gray-800'
+              }`}
+            >
+              {entry.text}
             </div>
-          ))}
-        </div>
+          </div>
+        ))}
+      </div>
 
-        {/* Controls */}
-        <div className="border-t border-gray-100 px-6 py-4">
-          {callStatus === 'active' ? (
-            <div className="flex items-center justify-center gap-4">
-              <button
-                onClick={toggleMute}
-                className={`flex h-12 w-12 items-center justify-center rounded-full transition ${
-                  isMuted
-                    ? 'bg-gray-200 text-gray-600 hover:bg-gray-300'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                {isMuted ? <MicOff size={20} /> : <Mic size={20} />}
-              </button>
-              <button
-                onClick={endCall}
-                className="flex h-14 w-14 items-center justify-center rounded-full bg-red-500 text-white shadow-lg transition hover:bg-red-600"
-              >
-                <PhoneOff size={22} />
-              </button>
-              <div className="h-12 w-12" /> {/* spacer for centering */}
-            </div>
-          ) : callStatus === 'ended' ? (
-            <div className="flex gap-3">
-              <button
-                onClick={() => { setCallStatus('idle'); setTranscript([]); setDuration(0); }}
-                className="flex-1 rounded-lg border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50"
-              >
-                Call Again
-              </button>
-              <button
-                onClick={onClose}
-                className="flex-1 rounded-lg bg-primary py-2.5 text-sm font-semibold text-white hover:bg-primary-hover"
-              >
-                Back to Chat
-              </button>
-            </div>
-          ) : (
+      {/* Controls */}
+      <div className="border-t border-gray-200 px-4 py-3">
+        {callStatus === 'active' ? (
+          <div className="flex items-center justify-center gap-4">
+            <button
+              onClick={toggleMute}
+              className={`flex h-10 w-10 items-center justify-center rounded-full transition ${
+                isMuted
+                  ? 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              {isMuted ? <MicOff size={18} /> : <Mic size={18} />}
+            </button>
+            <button
+              onClick={endCall}
+              className="flex h-12 w-12 items-center justify-center rounded-full bg-red-500 text-white shadow-lg transition hover:bg-red-600"
+            >
+              <PhoneOff size={20} />
+            </button>
+            <div className="h-10 w-10" />
+          </div>
+        ) : callStatus === 'ended' ? (
+          <div className="flex gap-3">
+            <button
+              onClick={() => { setCallStatus('idle'); setTranscript([]); setDuration(0); }}
+              className="flex-1 rounded-lg border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50"
+            >
+              Call Again
+            </button>
             <button
               onClick={onClose}
-              className="w-full rounded-lg border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50"
+              className="flex-1 rounded-lg bg-primary py-2.5 text-sm font-semibold text-white hover:bg-primary-hover"
             >
-              Cancel
+              Back to Chat
             </button>
-          )}
-        </div>
+          </div>
+        ) : (
+          <button
+            onClick={onClose}
+            className="w-full rounded-lg border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+        )}
       </div>
     </div>
   );
